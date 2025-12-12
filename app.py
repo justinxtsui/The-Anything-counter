@@ -85,10 +85,17 @@ st.markdown("""
                 border-left: 5px solid #302A7E; 
                 margin: 15px 0;">
         <p style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
-            <strong>Upload a CSV or Excel file to create professional ranking charts</strong>
+            <strong>Upload a CSV or Excel file to create a ranking chart</strong>
         </p>
-        <p style="margin: 0; font-size: 14px; color: #666;">
-            Last updated 25/10/25 – JT
+        <a href="https://platform.beauhurst.com/search/advancedsearch/?avs_json=eyJiYXNlIjoiY29tcGFueSIsImNvbWJpbmUiOiJhbmQiLCJjaGlsZHJlbiI6W119" 
+           target="_blank" 
+           style="display: inline-block; background: #fff; padding: 10px 16px; border-radius: 6px; 
+                  border: 1px solid #ddd; color: #302A7E; font-weight: 600; text-decoration: none; 
+                  font-size: 14px; transition: all 0.2s ease; margin-bottom: 12px;">
+           🔗 Beauhurst Advanced Search
+        </a>
+        <p style="margin: 12px 0 0 0; font-size: 14px; color: #666;">
+            Last updated 25/10/25 – Contact <a href="mailto:justin.tsui@beauhurst.com" style="color: #302A7E; text-decoration: none; font-weight: 600;">justin.tsui@beauhurst.com</a> for support
         </p>
     </div>
 """, unsafe_allow_html=True)
@@ -96,7 +103,7 @@ st.markdown("""
 st.markdown("---")
 
 # ========================= HELPERS =========================
-def read_any_table(file):
+def read_any_table(file, sheet_name=None):
     name = getattr(file, "name", "") or ""
     ext = os.path.splitext(name)[1].lower()
 
@@ -123,17 +130,19 @@ def read_any_table(file):
 
         try:
             xls = pd.ExcelFile(file, engine=engine)
-            sheet = st.selectbox("Select sheet:", xls.sheet_names, index=0)
-            return pd.read_excel(file, sheet_name=sheet, engine=engine)
+            # Return sheet names if no sheet specified
+            if sheet_name is None:
+                return None, xls.sheet_names
+            return pd.read_excel(file, sheet_name=sheet_name, engine=engine), None
         except Exception as e:
             st.exception(e)
             st.stop()
 
     # CSV fallback
     try:
-        return pd.read_csv(file)
+        return pd.read_csv(file), None
     except UnicodeDecodeError:
-        return pd.read_csv(file, encoding="latin-1")
+        return pd.read_csv(file, encoding="latin-1"), None
 
 
 def money_fmt(v):
@@ -336,10 +345,10 @@ def _warn_boundary_tie(all_labels, all_values, top_n, metric_name, fmt=lambda x:
     except Exception:
         return
     if np.isfinite(vN) and np.isfinite(vNext) and vN == vNext:
-        st.info(
-            f"Note: Rank {int(top_n)} (**{all_labels[int(top_n)-1]}**) "
-            f"has the same {metric_name.lower()} as Rank {int(top_n)+1} (**{all_labels[int(top_n)]}**): {fmt(vN)}. "
-            "Consider increasing the count or using Custom (drag & drop) to break the tie."
+        st.warning(
+            f"⚠️ **Warning:** Rank {int(top_n)} (**{all_labels[int(top_n)-1]}**) "
+            f"has the same {metric_name.lower()} as Rank {int(top_n)+1} (**{all_labels[int(top_n)]}**): **{fmt(vN)}**.\n\n"
+            f"Consider increasing the count to break the tie."
         )
 
 
@@ -356,12 +365,30 @@ with st.sidebar:
     
     if uploaded_file:
         st.caption(f"✅ **{uploaded_file.name}** uploaded successfully")
+        
+        # Check if it's an Excel file and get sheet names
+        name = getattr(uploaded_file, "name", "") or ""
+        ext = os.path.splitext(name)[1].lower()
+        
+        sheet_name = None
+        if ext in [".xlsx", ".xls"]:
+            # Get sheet names first
+            df_temp, sheet_names = read_any_table(uploaded_file, sheet_name=None)
+            if sheet_names:
+                sheet_name = st.selectbox("Select sheet:", sheet_names, index=0)
 
 # Initialize df
 df = None
 
 if uploaded_file is not None:
-    df = read_any_table(uploaded_file)
+    # Load the actual data with selected sheet
+    name = getattr(uploaded_file, "name", "") or ""
+    ext = os.path.splitext(name)[1].lower()
+    
+    if ext in [".xlsx", ".xls"]:
+        df, _ = read_any_table(uploaded_file, sheet_name=sheet_name)
+    else:
+        df, _ = read_any_table(uploaded_file)
 
     # ========================= CHART TITLE SECTION =========================
     with st.sidebar:
