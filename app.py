@@ -363,55 +363,30 @@ df = None
 if uploaded_file is not None:
     df = read_any_table(uploaded_file)
 
-    # ========================= FILTER SECTION =========================
+    # ========================= CHART TITLE SECTION =========================
     with st.sidebar:
         st.markdown("---")
-        st.header("2. Data Filter (Optional)")
-        
-        filter_enabled = st.checkbox('Enable Data Filtering', value=False)
-        
-        if filter_enabled:
-            cols = [str(c) for c in df.columns]
-            if cols:
-                filter_col = st.selectbox("Filter column:", options=cols, index=0)
-                
-                # Normalise display values
-                ser_raw = df[filter_col]
-                ser_disp = ser_raw.astype(str).fillna("")
-                ser_disp = ser_disp.replace({"nan": "", "None": ""})
+        st.header("2. Chart Title")
+        chart_title_input = st.text_input(
+            "Title:", 
+            value="Ranking Chart",
+            help="Customize the title shown above the chart"
+        )
 
-                uniques = pd.Series(ser_disp.unique(), dtype=str)
-                uniques = uniques.fillna("")
-                display_vals = uniques.replace({"": "(blank)"})
-                display_vals = sorted(display_vals.tolist(), key=lambda x: x.lower())
-
-                if len(display_vals) > 300:
-                    st.warning("Too many unique values — showing only the first 300.")
-                    display_vals = display_vals[:300]
-
-                selected_vals = st.multiselect("Select categories:", options=display_vals)
-                mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True)
-
-                if selected_vals:
-                    selected_raw = [("" if v == "(blank)" else v) for v in selected_vals]
-                    mask = ser_disp.isin(selected_raw)
-                    df = df[mask] if mode == "Include" else df[~mask]
-                    st.success(f"Filtered to {len(df):,} rows")
-
-    # ========================= ANALYSIS MODE SECTION =========================
+    # ========================= RANKING MODE SECTION =========================
     with st.sidebar:
         st.markdown("---")
-        st.header("3. Analysis Mode")
+        st.header("3. Are you ranking Industries/Buzzwords?")
         
         mode = st.radio(
-            "What would you like to rank?",
-            ["Anything Counter", "Industries/Buzzwords"],
+            "",
+            ["Yes", "No"],
             horizontal=True,
-            help="Choose whether to rank general data or specific Industries/Buzzwords columns"
+            help="Choose Yes for Industries/Buzzwords or No for general data ranking"
         )
 
     # ========================= INDUSTRIES/BUZZWORDS MODE =========================
-    if mode == "Industries/Buzzwords":
+    if mode == "Yes":
         layout = detect_layout(df)
         if layout["mode"] == "unknown":
             st.error("Expected either single columns ('Industries','Buzzwords') or wide columns starting with 'Industries - ' / 'Buzzwords - '.")
@@ -419,7 +394,7 @@ if uploaded_file is not None:
 
         with st.sidebar:
             st.markdown("---")
-            st.header("4. Ranking Configuration")
+            st.header("4. Analysis Options")
             
             ranking_by = st.radio("Rank by:", ["Count", "Total Amount Raised"], horizontal=True)
             
@@ -487,23 +462,98 @@ if uploaded_file is not None:
         labels = [str(x) for x in metric_series.index.tolist()]
         values = metric_series.values.tolist()
 
-        # ---- Exclude in sidebar
+        # ========================= DATA FILTER SECTION =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. Exclusions (Optional)")
-            excluded = st.multiselect(
-                "Exclude labels from chart:", 
-                options=labels, 
-                default=[],
-                help="Select items to exclude from the final chart"
-            )
+            st.header("5. Data Filter (Optional)")
             
-        labels_values = [(l, v) for l, v in zip(labels, values) if l not in set(excluded)]
-        if not labels_values:
-            st.info("Nothing to show — all values are excluded.")
-            st.stop()
-        labels, values = zip(*labels_values)
-        labels, values = list(labels), list(values)
+            filter_enabled = st.checkbox('Enable Data Filtering', value=False, key='filter_ind_buzz')
+            
+            if filter_enabled:
+                filter_mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True, key='filter_mode_ind_buzz')
+                
+                cols = [str(c) for c in df.columns]
+                if cols:
+                    filter_col = st.selectbox("Filter column:", options=cols, index=0, key='filter_col_ind_buzz')
+                    
+                    # Normalise display values
+                    ser_raw = df[filter_col]
+                    ser_disp = ser_raw.astype(str).fillna("")
+                    ser_disp = ser_disp.replace({"nan": "", "None": ""})
+
+                    uniques = pd.Series(ser_disp.unique(), dtype=str)
+                    uniques = uniques.fillna("")
+                    display_vals = uniques.replace({"": "(blank)"})
+                    display_vals = sorted(display_vals.tolist(), key=lambda x: x.lower())
+
+                    if len(display_vals) > 300:
+                        st.warning("Too many unique values — showing only the first 300.")
+                        display_vals = display_vals[:300]
+
+                    selected_vals = st.multiselect("Select categories:", options=display_vals, key='filter_vals_ind_buzz')
+
+                    if selected_vals:
+                        selected_raw = [("" if v == "(blank)" else v) for v in selected_vals]
+                        mask = ser_disp.isin(selected_raw)
+                        
+                        # Filter the original data and recompute
+                        df_filtered = df[mask] if filter_mode == "Include" else df[~mask]
+                        st.success(f"Filtered to {len(df_filtered):,} rows")
+                        
+                        # Recompute with filtered data
+                        if layout["mode"] == "single":
+                            industries_col = layout["ind_col"]
+                            buzzwords_col  = layout["buzz_col"]
+
+                            inds = df_filtered[industries_col].dropna().astype(str).str.split(",").explode().str.strip()
+                            buzz = df_filtered[buzzwords_col].dropna().astype(str).str.split(",").explode().str.strip()
+                            items = pd.concat([inds, buzz], ignore_index=True)
+                            items = items[items.ne("") & items.ne("nan")]
+                            counts = items.value_counts()
+
+                            if amount_choice:
+                                amt = pd.to_numeric(df_filtered[amount_choice], errors="coerce").fillna(0.0)
+
+                                def explode_with_rowkey(series, keyname):
+                                    s = series.where(series.notna(), "").astype(str).str.split(",")
+                                    ex = s.explode().str.strip()
+                                    mask = ex.ne("") & ex.ne("nan")
+                                    out = pd.DataFrame({keyname: ex[mask]})
+                                    out["__row__"] = np.repeat(np.arange(len(series)), s.str.len())[mask]
+                                    return out
+
+                                ex_i = explode_with_rowkey(df_filtered[industries_col], "item")
+                                ex_b = explode_with_rowkey(df_filtered[buzzwords_col], "item")
+                                ex = pd.concat([ex_i, ex_b], ignore_index=True)
+                                ex = ex[ex["item"].ne("")]
+                                ex = ex.merge(pd.DataFrame({"__row__": np.arange(len(df_filtered)), "amt": amt}), on="__row__", how="left")
+                                amount_per_item = ex.groupby("item", as_index=True)["amt"].sum()
+                            else:
+                                amount_per_item = pd.Series(0.0, index=counts.index)
+
+                        else:  # wide
+                            ind_cols  = layout.get("ind_cols", [])
+                            buzz_cols = layout.get("buzz_cols", [])
+                            pieces = []
+                            if ind_cols:
+                                pieces.append(pd.DataFrame({c.split(" - ", 1)[1]: df_filtered[c] for c in ind_cols}))
+                            if buzz_cols:
+                                pieces.append(pd.DataFrame({c.split(" - ", 1)[1]: df_filtered[c] for c in buzz_cols}))
+                            M = pd.concat(pieces, axis=1)
+                            M = M.groupby(level=0, axis=1).sum()
+                            M_bool = coerce_bool_df(M)
+                            counts = M_bool.sum(axis=0).sort_values(ascending=False)
+                            if amount_choice:
+                                amt = pd.to_numeric(df_filtered[amount_choice], errors="coerce").fillna(0.0)
+                                amount_per_item = (M_bool.astype(float).multiply(amt, axis=0)).sum(axis=0)
+                            else:
+                                amount_per_item = pd.Series(0.0, index=counts.index)
+
+                        metric_series = counts if ranking_by == "Count" else amount_per_item
+                        metric_series = metric_series.sort_values(ascending=False)
+
+                        labels = [str(x) for x in metric_series.index.tolist()]
+                        values = metric_series.values.tolist()
 
         # ---- Ordering & Top N in sidebar
         with st.sidebar:
@@ -558,15 +608,8 @@ if uploaded_file is not None:
                 fmt=(money_fmt if ranking_by != "Count" else int_commas)
             )
 
-        # Chart title in sidebar
-        with st.sidebar:
-            st.markdown("---")
-            st.header("7. Chart Title")
-            chart_title = st.text_input(
-                "Title:", 
-                f"Top {len(labels)} Industries/Buzzwords by {ranking_by}",
-                help="Customize the title shown above the chart"
-            )
+        # Chart title uses the input from section 2
+        chart_title = chart_title_input
 
         # Main area: Chart display
         st.subheader("Chart Preview")
@@ -579,7 +622,7 @@ if uploaded_file is not None:
         # Download in sidebar
         with st.sidebar:
             st.markdown("---")
-            st.header("8. Download Chart")
+            st.header("7. Download Chart")
             
             svg_buffer = io.BytesIO()
             fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
@@ -652,23 +695,69 @@ if uploaded_file is not None:
             labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
             labels, values = list(labels), list(values)
 
-        # ---- Exclude in sidebar
+        # ========================= DATA FILTER SECTION =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. Exclusions (Optional)")
-            excluded = st.multiselect(
-                "Exclude labels from chart:", 
-                options=labels, 
-                default=[],
-                help="Select items to exclude from the final chart"
-            )
+            st.header("5. Data Filter (Optional)")
             
-        labels_values = [(l, v) for l, v in zip(labels, values) if l not in set(excluded)]
-        if not labels_values:
-            st.info("Nothing to show — all values are excluded.")
-            st.stop()
-        labels, values = zip(*labels_values)
-        labels, values = list(labels), list(values)
+            filter_enabled = st.checkbox('Enable Data Filtering', value=False, key='filter_anything')
+            
+            if filter_enabled:
+                filter_mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True, key='filter_mode_anything')
+                
+                cols = [str(c) for c in df.columns]
+                if cols:
+                    filter_col = st.selectbox("Filter column:", options=cols, index=0, key='filter_col_anything')
+                    
+                    # Normalise display values
+                    ser_raw = df[filter_col]
+                    ser_disp = ser_raw.astype(str).fillna("")
+                    ser_disp = ser_disp.replace({"nan": "", "None": ""})
+
+                    uniques = pd.Series(ser_disp.unique(), dtype=str)
+                    uniques = uniques.fillna("")
+                    display_vals = uniques.replace({"": "(blank)"})
+                    display_vals = sorted(display_vals.tolist(), key=lambda x: x.lower())
+
+                    if len(display_vals) > 300:
+                        st.warning("Too many unique values — showing only the first 300.")
+                        display_vals = display_vals[:300]
+
+                    selected_vals = st.multiselect("Select categories:", options=display_vals, key='filter_vals_anything')
+
+                    if selected_vals:
+                        selected_raw = [("" if v == "(blank)" else v) for v in selected_vals]
+                        mask = ser_disp.isin(selected_raw)
+                        
+                        # Filter and recompute
+                        df_filtered = df[mask] if filter_mode == "Include" else df[~mask]
+                        st.success(f"Filtered to {len(df_filtered):,} rows")
+                        
+                        # Recompute with filtered data
+                        if analysis_type == "Count Values":
+                            if explode:
+                                value_list = []
+                                for val in df_filtered[col].dropna():
+                                    items = [s.strip() for s in str(val).split(",") if s.strip()]
+                                    value_list.extend(items)
+                                counts = Counter(value_list)
+                                labels = list(counts.keys())
+                                values = list(counts.values())
+                            else:
+                                vc = df_filtered[col].value_counts(dropna=False)
+                                labels = [("(blank)" if (isinstance(k, float) and pd.isna(k)) else str(k)) for k in vc.index.tolist()]
+                                values = vc.values.tolist()
+                        else:  # Sum Values
+                            vals = pd.to_numeric(df_filtered[sum_col], errors="coerce")
+                            keys = df_filtered[group_col].astype(str).fillna("")
+                            summed = vals.groupby(keys, sort=False).sum()
+                            labels = summed.index.tolist()
+                            values = summed.values.tolist()
+                        
+                        # Re-sort
+                        if labels:
+                            labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
+                            labels, values = list(labels), list(values)
 
         # ---- Ordering & Top N in sidebar
         with st.sidebar:
@@ -721,15 +810,8 @@ if uploaded_file is not None:
                 fmt=(money_fmt if ranking_by != "Count" else int_commas)
             )
 
-        # Chart title in sidebar
-        with st.sidebar:
-            st.markdown("---")
-            st.header("7. Chart Title")
-            chart_title = st.text_input(
-                "Title:", 
-                f"Top {len(labels)} by {ranking_by}",
-                help="Customize the title shown above the chart"
-            )
+        # Chart title uses the input from section 2
+        chart_title = chart_title_input
 
         # Main area: Chart display
         st.subheader("Chart Preview")
@@ -742,7 +824,7 @@ if uploaded_file is not None:
         # Download in sidebar
         with st.sidebar:
             st.markdown("---")
-            st.header("8. Download Chart")
+            st.header("7. Download Chart")
             
             svg_buffer = io.BytesIO()
             fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
