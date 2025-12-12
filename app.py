@@ -81,7 +81,7 @@ st.markdown(f'<h1 style="color:{APP_TITLE_COLOR};">Ranklin </h1>', unsafe_allow_
 # Use session state to track if a file has been uploaded
 if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file is None:
     st.session_state.uploaded_file = None
-    st.info("👈🏻 **Please upload your data file using the controls in the sidebar to begin.**")
+    st.info("👈🏻 Please upload your data file using the controls in the sidebar to begin.")
 
 # Styled description box
 st.markdown("""
@@ -869,40 +869,5 @@ if uploaded_file is not None:
             )
 
 else:
-    # Message for initial load (only the "How It Works" content remains here)
     st.markdown("---")
-    
-    st.subheader("How It Works")
-    st.markdown("""
-    This tool creates professional ranking charts from your data with customizable options.
-
-    1.  **Upload:** Provide your CSV or Excel file in the sidebar (Section 1)
-    2.  **Title:** Set your chart title (Section 2)
-    3.  **Choose Mode:** Select between general ranking or Industries/Buzzwords analysis (Section 3)
-    4.  **Configure:** Set your ranking criteria and options (Section 4)
-    5.  **Filter (Optional):** Apply data filters to focus on specific subsets (Section 5)
-    6.  **Customize:** Adjust order and set display count (Section 6)
-    7.  **Download:** Export your chart as a high-quality SVG file (Section 7)
-    """)
-    
-    st.markdown("---")
-    st.subheader("Supported Features")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **Analysis Types:**
-        - Count values in any column
-        - Sum numeric values by category
-        - Industries/Buzzwords ranking
-        - Comma-separated value explosion
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Customization:**
-        - Data filtering by category
-        - Drag-and-drop reordering
-        - Exclude specific items
-        - Custom chart titles
-        """)
+ 
