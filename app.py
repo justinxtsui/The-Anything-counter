@@ -81,7 +81,7 @@ st.markdown(f'<h1 style="color:{APP_TITLE_COLOR};">Ranklin </h1>', unsafe_allow_
 # Use session state to track if a file has been uploaded
 if 'uploaded_file' not in st.session_state or st.session_state.uploaded_file is None:
     st.session_state.uploaded_file = None
-    st.info("⬆️ **Please upload your data file using the controls in the sidebar (Section 1) to begin chart configuration.**")
+    st.info("👈🏻 **Please upload your data file using the controls in the sidebar to begin.**")
 
 # Styled description box
 st.markdown("""
@@ -91,7 +91,6 @@ st.markdown("""
                 border-left: 5px solid #302A7E; 
                 margin: 15px 0;">
         <p style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
-        </p>
         <a href="https://platform.beauhurst.com/search/advancedsearch/?avs_json=eyJiYXNlIjoiY29tcGFueSIsImNvbWJpbmUiOiJhbmQiLCJjaGlsZHJlbiI6W119" 
             target="_blank" 
             style="display: inline-block; background: #fff; padding: 10px 16px; border-radius: 6px; 
@@ -104,8 +103,6 @@ st.markdown("""
         </p>
     </div>
 """, unsafe_allow_html=True)
-
-st.markdown("---")
 
 # ========================= HELPERS =========================
 def read_any_table(file, sheet_name=None):
