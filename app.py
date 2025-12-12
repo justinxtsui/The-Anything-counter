@@ -8,13 +8,92 @@ import io, os
 from collections import Counter
 from datetime import datetime
 
-# ========================= PAGE =========================
-st.set_page_config(page_title="Ranklin 🤓", layout="wide")
-st.title("Ranklin 🤓")
-st.write("Upload a CSV or Excel file.")
-st.write("Last updated 25/10/25 – JT")
+# ========================= CONFIGURATION =========================
+APP_TITLE_COLOR = '#000000'
+PRIMARY_COLOR = '#302A7E'
+SECONDARY_COLOR = '#8884B3'
+LIGHT_COLOR = '#D0CCE5'
 
-uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls"])
+# ========================= PAGE =========================
+st.set_page_config(page_title="Ranklin 🤓", layout="wide", initial_sidebar_state="expanded")
+
+# Custom CSS for better styling
+st.markdown("""
+    <style>
+    /* Main title styling */
+    h1 {
+        color: #000000 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background-color: #fafafa;
+    }
+    
+    /* Section headers */
+    .section-header {
+        color: #302A7E;
+        font-weight: 600;
+        font-size: 1.2rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: #f5f7fa;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    
+    /* Button styling */
+    .stDownloadButton button {
+        background-color: #302A7E;
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        padding: 0.5rem 1rem;
+        width: 100%;
+    }
+    
+    .stDownloadButton button:hover {
+        background-color: #8884B3;
+    }
+    
+    /* Radio button styling */
+    [data-testid="stRadio"] > label {
+        font-weight: 600;
+    }
+    
+    /* Multiselect styling */
+    [data-testid="stMultiSelect"] label {
+        font-weight: 600;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Main title
+st.markdown(f'<h1 style="color:{APP_TITLE_COLOR};">Ranklin 🤓</h1>', unsafe_allow_html=True)
+
+# Styled description box
+st.markdown("""
+    <div style="background: #f5f7fa; 
+                padding: 20px; 
+                border-radius: 10px; 
+                border-left: 5px solid #302A7E; 
+                margin: 15px 0;">
+        <p style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
+            <strong>Upload a CSV or Excel file to create professional ranking charts</strong>
+        </p>
+        <p style="margin: 0; font-size: 14px; color: #666;">
+            Last updated 25/10/25 – JT
+        </p>
+    </div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # ========================= HELPERS =========================
 def read_any_table(file):
@@ -160,7 +239,7 @@ def plot_bar(labels, values, title, highlight_first=True, right_formatter=int_co
 
     ax.set_title(title, fontsize=15, pad=20, fontweight='normal')
     ax.invert_yaxis()
-    st.pyplot(fig, use_container_width=True)
+    
     return fig
 
 
@@ -176,6 +255,37 @@ def _drag_order_ui(default_labels, metric_map, top_n):
     # Try drag & drop
     try:
         from streamlit_sortables import sort_items  # pip install streamlit-sortables>=0.3.1
+        
+        st.markdown("""
+            <style>
+            /* Modern sortable styling */
+            .sortable-item {
+                background: white !important;
+                border: 2px dashed #d0d0d0 !important;
+                border-radius: 8px !important;
+                padding: 14px 16px !important;
+                margin: 10px 0 !important;
+                cursor: grab !important;
+                transition: all 0.2s ease !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+            }
+            .sortable-item:hover {
+                background: #fafafa !important;
+                border-color: #8884B3 !important;
+                border-style: solid !important;
+                box-shadow: 0 2px 8px rgba(136,132,179,0.15) !important;
+                transform: translateY(-1px) !important;
+            }
+            .sortable-item:active {
+                cursor: grabbing !important;
+            }
+            .sortable-ghost {
+                opacity: 0.4 !important;
+                background: #f0f0f0 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
         ordered_full = sort_items(default_labels)  # full list
         if isinstance(ordered_full, list) and len(ordered_full) == len(default_labels):
             values_full = [metric_map.get(lbl, 0) for lbl in ordered_full]
@@ -233,73 +343,96 @@ def _warn_boundary_tie(all_labels, all_values, top_n, metric_name, fmt=lambda x:
         )
 
 
-# ---------- NEW: Optional category filter ----------
-def apply_category_filter(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Let the user choose a column and filter by selected categories.
-    Returns the filtered DataFrame (or the original if no selection is made).
-    """
-    st.subheader("Optional Filter")
-    cols = [str(c) for c in df.columns]
-    if not cols:
-        return df
-
-    filter_col = st.selectbox("Filter column:", options=cols, index=0)
-    # Normalise display values (keep a mapping so we filter correctly)
-    ser_raw = df[filter_col]
-    ser_disp = ser_raw.astype(str).fillna("")
-    ser_disp = ser_disp.replace({"nan": "", "None": ""})
-
-    uniques = pd.Series(ser_disp.unique(), dtype=str)
-    uniques = uniques.fillna("")
-    # Represent blanks clearly
-    display_vals = uniques.replace({"": "(blank)"})
-    display_vals = sorted(display_vals.tolist(), key=lambda x: x.lower())
-
-    if len(display_vals) > 300:
-        st.warning("Too many unique values — showing only the first 300.")
-        display_vals = display_vals[:300]
-
-    selected_vals = st.multiselect("Select categories:", options=display_vals)
-    mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True)
-
-    if selected_vals:
-        # Map selected display values back to their raw equivalents for comparison
-        selected_raw = [("" if v == "(blank)" else v) for v in selected_vals]
-        mask = ser_disp.isin(selected_raw)
-        df_out = df[mask] if mode == "Include" else df[~mask]
-        st.success(f"Filtered to {len(df_out):,} rows (from {len(df):,}).")
-        return df_out
-
-    return df
-
-
 # ========================= APP =========================
+
+# Sidebar for file upload
+with st.sidebar:
+    st.header("1. Data Source")
+    uploaded_file = st.file_uploader(
+        "Upload your Excel or CSV file", 
+        type=["csv", "xlsx", "xls"],
+        help="Upload a CSV or Excel file to begin creating your ranking chart."
+    )
+    
+    if uploaded_file:
+        st.caption(f"✅ **{uploaded_file.name}** uploaded successfully")
+
+# Initialize df
+df = None
+
 if uploaded_file is not None:
     df = read_any_table(uploaded_file)
 
-    # >>> Apply the optional category filter <<<
-    df = apply_category_filter(df)
+    # ========================= FILTER SECTION =========================
+    with st.sidebar:
+        st.markdown("---")
+        st.header("2. Data Filter (Optional)")
+        
+        filter_enabled = st.checkbox('Enable Data Filtering', value=False)
+        
+        if filter_enabled:
+            cols = [str(c) for c in df.columns]
+            if cols:
+                filter_col = st.selectbox("Filter column:", options=cols, index=0)
+                
+                # Normalise display values
+                ser_raw = df[filter_col]
+                ser_disp = ser_raw.astype(str).fillna("")
+                ser_disp = ser_disp.replace({"nan": "", "None": ""})
 
-    mode = st.radio(
-        "Are you ranking **Industries/Buzzwords**?",
-        ["No – use Anything Counter", "Yes – use Industries/Buzzwords"],
-        horizontal=True
-    )
+                uniques = pd.Series(ser_disp.unique(), dtype=str)
+                uniques = uniques.fillna("")
+                display_vals = uniques.replace({"": "(blank)"})
+                display_vals = sorted(display_vals.tolist(), key=lambda x: x.lower())
 
-    # -------------------- INDUSTRIES/Buzzwords --------------------
-    if mode.endswith("Industries/Buzzwords"):
+                if len(display_vals) > 300:
+                    st.warning("Too many unique values — showing only the first 300.")
+                    display_vals = display_vals[:300]
+
+                selected_vals = st.multiselect("Select categories:", options=display_vals)
+                mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True)
+
+                if selected_vals:
+                    selected_raw = [("" if v == "(blank)" else v) for v in selected_vals]
+                    mask = ser_disp.isin(selected_raw)
+                    df = df[mask] if mode == "Include" else df[~mask]
+                    st.success(f"Filtered to {len(df):,} rows")
+
+    # ========================= ANALYSIS MODE SECTION =========================
+    with st.sidebar:
+        st.markdown("---")
+        st.header("3. Analysis Mode")
+        
+        mode = st.radio(
+            "What would you like to rank?",
+            ["Anything Counter", "Industries/Buzzwords"],
+            horizontal=True,
+            help="Choose whether to rank general data or specific Industries/Buzzwords columns"
+        )
+
+    # ========================= INDUSTRIES/BUZZWORDS MODE =========================
+    if mode == "Industries/Buzzwords":
         layout = detect_layout(df)
         if layout["mode"] == "unknown":
             st.error("Expected either single columns ('Industries','Buzzwords') or wide columns starting with 'Industries - ' / 'Buzzwords - '.")
             st.stop()
 
-        ranking_by = st.radio("Rank by:", ["Count", "Total Amount Raised"], horizontal=True)
-        amount_candidates = find_amount_columns(list(df.columns.astype(str)))
-        amount_choice = st.selectbox("Amount column (optional)", ["<None>"] + amount_candidates, index=0)
-        amount_choice = None if amount_choice == "<None>" else amount_choice
+        with st.sidebar:
+            st.markdown("---")
+            st.header("4. Ranking Configuration")
+            
+            ranking_by = st.radio("Rank by:", ["Count", "Total Amount Raised"], horizontal=True)
+            
+            amount_candidates = find_amount_columns(list(df.columns.astype(str)))
+            amount_choice = st.selectbox(
+                "Amount column (optional)", 
+                ["<None>"] + amount_candidates, 
+                index=0,
+                help="Select the column containing amount values for ranking"
+            )
+            amount_choice = None if amount_choice == "<None>" else amount_choice
 
-        # ---- Build tallies
+        # ---- Build tallies (same logic as before)
         if layout["mode"] == "single":
             industries_col = layout["ind_col"]
             buzzwords_col  = layout["buzz_col"]
@@ -354,8 +487,17 @@ if uploaded_file is not None:
         labels = [str(x) for x in metric_series.index.tolist()]
         values = metric_series.values.tolist()
 
-        # ---- Exclude
-        excluded = st.multiselect("Exclude labels", options=labels, default=[])
+        # ---- Exclude in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("5. Exclusions (Optional)")
+            excluded = st.multiselect(
+                "Exclude labels from chart:", 
+                options=labels, 
+                default=[],
+                help="Select items to exclude from the final chart"
+            )
+            
         labels_values = [(l, v) for l, v in zip(labels, values) if l not in set(excluded)]
         if not labels_values:
             st.info("Nothing to show — all values are excluded.")
@@ -363,15 +505,19 @@ if uploaded_file is not None:
         labels, values = zip(*labels_values)
         labels, values = list(labels), list(values)
 
-        # ---- Ordering & Top N (stepper)
-        with st.expander("Order & display", expanded=False):
+        # ---- Ordering & Top N in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("6. Order & Display")
+            
             rank_mode = st.radio(
-                "Ranking mode",
+                "Ranking mode:",
                 ["Highest first", "Lowest first", "Custom (drag & drop)"],
                 horizontal=True
             )
+            
             top_n = st.number_input(
-                "How many bars to show",
+                "Number of bars to show:",
                 min_value=1,
                 max_value=len(labels),
                 value=min(10, len(labels)),
@@ -386,7 +532,6 @@ if uploaded_file is not None:
             full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
             full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
 
-            # tie reminder before slicing
             _warn_boundary_tie(
                 full_labels_ordered,
                 full_values_ordered,
@@ -400,9 +545,11 @@ if uploaded_file is not None:
         else:
             default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
             metric_map = _metric_map(labels, values)
-            labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
+            
+            with st.sidebar:
+                st.markdown("**Drag to Reorder:**")
+                labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
 
-            # tie reminder on dragged order
             _warn_boundary_tie(
                 full_ordered_labels,
                 full_ordered_values,
@@ -411,28 +558,62 @@ if uploaded_file is not None:
                 fmt=(money_fmt if ranking_by != "Count" else int_commas)
             )
 
-        chart_title = st.text_input("Chart title:", f"Top {len(labels)} Industries/Buzzwords by {ranking_by}")
-        fig = plot_bar(labels, values, chart_title, highlight_first=highlight_top, right_formatter=formatter)
+        # Chart title in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("7. Chart Title")
+            chart_title = st.text_input(
+                "Title:", 
+                f"Top {len(labels)} Industries/Buzzwords by {ranking_by}",
+                help="Customize the title shown above the chart"
+            )
 
-        # Download SVG
-        svg_buffer = io.BytesIO()
-        fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
-        svg_buffer.seek(0)
-        st.download_button(
-            label="Download Chart as SVG",
-            data=svg_buffer,
-            file_name=f"{chart_title.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
-            mime="image/svg+xml",
-        )
+        # Main area: Chart display
+        st.subheader("Chart Preview")
+        
+        col_left, col_chart, col_right = st.columns([0.05, 7, 0.05])
+        with col_chart:
+            fig = plot_bar(labels, values, chart_title, highlight_first=highlight_top, right_formatter=formatter)
+            st.pyplot(fig, use_container_width=True)
 
-    # -------------------- ANYTHING COUNTER --------------------
+        # Download in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("8. Download Chart")
+            
+            svg_buffer = io.BytesIO()
+            fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
+            svg_buffer.seek(0)
+            
+            st.download_button(
+                label="Download as SVG (Vector)",
+                data=svg_buffer,
+                file_name=f"{chart_title.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
+                mime="image/svg+xml",
+                use_container_width=True
+            )
+
+    # ========================= ANYTHING COUNTER MODE =========================
     else:
-        st.subheader("Analysis Options")
-        analysis_type = st.radio("Select analysis type:", ["Count Values", "Sum Values"], horizontal=True)
+        with st.sidebar:
+            st.markdown("---")
+            st.header("4. Analysis Options")
+            
+            analysis_type = st.radio(
+                "Select analysis type:", 
+                ["Count Values", "Sum Values"], 
+                horizontal=True,
+                help="Choose whether to count occurrences or sum numeric values"
+            )
 
         if analysis_type == "Count Values":
-            col = st.selectbox("Select column:", df.columns.tolist())
-            explode = st.checkbox("Explode comma-separated values")
+            with st.sidebar:
+                col = st.selectbox("Select column:", df.columns.tolist())
+                explode = st.checkbox(
+                    "Explode comma-separated values",
+                    help="Split comma-separated values and count each separately"
+                )
+                
             if explode:
                 value_list = []
                 for val in df[col].dropna():
@@ -448,14 +629,16 @@ if uploaded_file is not None:
             ranking_by = "Count"
             formatter = int_commas
 
-        else:
-            group_col = st.selectbox("Group by:", df.columns.tolist())
-            num_cols = df.select_dtypes(include=["number"]).columns.tolist()
-            if not num_cols:
-                st.warning("No numeric columns found to sum.")
-                st.stop()
-            sum_col = st.selectbox("Sum column:", num_cols)
-            is_money = st.toggle("Treat values as money (£)?", True)
+        else:  # Sum Values
+            with st.sidebar:
+                group_col = st.selectbox("Group by:", df.columns.tolist())
+                num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+                if not num_cols:
+                    st.warning("No numeric columns found to sum.")
+                    st.stop()
+                sum_col = st.selectbox("Sum column:", num_cols)
+                is_money = st.toggle("Treat values as money (£)?", True)
+                
             vals = pd.to_numeric(df[sum_col], errors="coerce")
             keys = df[group_col].astype(str).fillna("")
             summed = vals.groupby(keys, sort=False).sum()
@@ -469,8 +652,17 @@ if uploaded_file is not None:
             labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
             labels, values = list(labels), list(values)
 
-        # ---- Exclude
-        excluded = st.multiselect("Exclude labels", options=labels, default=[])
+        # ---- Exclude in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("5. Exclusions (Optional)")
+            excluded = st.multiselect(
+                "Exclude labels from chart:", 
+                options=labels, 
+                default=[],
+                help="Select items to exclude from the final chart"
+            )
+            
         labels_values = [(l, v) for l, v in zip(labels, values) if l not in set(excluded)]
         if not labels_values:
             st.info("Nothing to show — all values are excluded.")
@@ -478,15 +670,19 @@ if uploaded_file is not None:
         labels, values = zip(*labels_values)
         labels, values = list(labels), list(values)
 
-        # ---- Ordering & Top N (stepper)
-        with st.expander("Order & display", expanded=False):
+        # ---- Ordering & Top N in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("6. Order & Display")
+            
             rank_mode = st.radio(
-                "Ranking mode",
+                "Ranking mode:",
                 ["Highest first", "Lowest first", "Custom (drag & drop)"],
                 horizontal=True
             )
+            
             top_n = st.number_input(
-                "How many bars to show",
+                "Number of bars to show:",
                 min_value=1,
                 max_value=len(labels),
                 value=min(10, len(labels)),
@@ -499,7 +695,6 @@ if uploaded_file is not None:
             full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
             full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
 
-            # tie reminder before slicing
             _warn_boundary_tie(
                 full_labels_ordered,
                 full_values_ordered,
@@ -513,9 +708,11 @@ if uploaded_file is not None:
         else:
             default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
             metric_map = _metric_map(labels, values)
-            labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
+            
+            with st.sidebar:
+                st.markdown("**Drag to Reorder:**")
+                labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
 
-            # tie reminder on dragged order
             _warn_boundary_tie(
                 full_ordered_labels,
                 full_ordered_values,
@@ -524,16 +721,77 @@ if uploaded_file is not None:
                 fmt=(money_fmt if ranking_by != "Count" else int_commas)
             )
 
-        chart_title = st.text_input("Chart title:", f"Top {len(labels)} by {ranking_by}")
-        fig = plot_bar(labels, values, chart_title, highlight_first=highlight_top, right_formatter=formatter)
+        # Chart title in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("7. Chart Title")
+            chart_title = st.text_input(
+                "Title:", 
+                f"Top {len(labels)} by {ranking_by}",
+                help="Customize the title shown above the chart"
+            )
 
-        # Download SVG
-        svg_buffer = io.BytesIO()
-        fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
-        svg_buffer.seek(0)
-        st.download_button(
-            label="Download Chart as SVG",
-            data=svg_buffer,
-            file_name=f"{chart_title.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
-            mime="image/svg+xml",
-        )
+        # Main area: Chart display
+        st.subheader("Chart Preview")
+        
+        col_left, col_chart, col_right = st.columns([0.05, 7, 0.05])
+        with col_chart:
+            fig = plot_bar(labels, values, chart_title, highlight_first=highlight_top, right_formatter=formatter)
+            st.pyplot(fig, use_container_width=True)
+
+        # Download in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.header("8. Download Chart")
+            
+            svg_buffer = io.BytesIO()
+            fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
+            svg_buffer.seek(0)
+            
+            st.download_button(
+                label="Download as SVG (Vector)",
+                data=svg_buffer,
+                file_name=f"{chart_title.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
+                mime="image/svg+xml",
+                use_container_width=True
+            )
+
+else:
+    # Message for initial load
+    st.info("⬆️ **Please upload your data file using the controls in the sidebar (Section 1) to begin chart configuration.**")
+    st.markdown("---")
+    
+    st.subheader("How It Works")
+    st.markdown("""
+    This tool creates professional ranking charts from your data with customizable options.
+
+    1.  **Upload:** Provide your CSV or Excel file in the sidebar (Section 1)
+    2.  **Filter (Optional):** Apply data filters to focus on specific subsets (Section 2)
+    3.  **Choose Mode:** Select between general ranking or Industries/Buzzwords analysis (Section 3)
+    4.  **Configure:** Set your ranking criteria and options (Section 4)
+    5.  **Customize:** Exclude items, adjust order, and set display count (Sections 5-6)
+    6.  **Title:** Set your chart title (Section 7)
+    7.  **Download:** Export your chart as a high-quality SVG file (Section 8)
+    """)
+    
+    st.markdown("---")
+    st.subheader("Supported Features")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Analysis Types:**
+        - Count values in any column
+        - Sum numeric values by category
+        - Industries/Buzzwords ranking
+        - Comma-separated value explosion
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Customization:**
+        - Data filtering by category
+        - Drag-and-drop reordering
+        - Exclude specific items
+        - Custom chart titles
+        """)
