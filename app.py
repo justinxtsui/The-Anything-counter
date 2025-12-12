@@ -15,7 +15,7 @@ SECONDARY_COLOR = '#8884B3'
 LIGHT_COLOR = '#D0CCE5'
 
 # ========================= PAGE =========================
-st.set_page_config(page_title="Ranklin 🤓", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Ranklin", layout="wide", initial_sidebar_state="expanded")
 
 # Custom CSS for better styling
 st.markdown("""
@@ -75,7 +75,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Main title
-st.markdown(f'<h1 style="color:{APP_TITLE_COLOR};">Ranklin 🤓</h1>', unsafe_allow_html=True)
+st.markdown(f'<h1 style="color:{APP_TITLE_COLOR};">Ranklin </h1>', unsafe_allow_html=True)
 
 # *** MODIFICATION 1: Initial info message right after the title ***
 # Use session state to track if a file has been uploaded
@@ -91,7 +91,6 @@ st.markdown("""
                 border-left: 5px solid #302A7E; 
                 margin: 15px 0;">
         <p style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
-            <strong>Create a ranking chart from your uploaded data.</strong>
         </p>
         <a href="https://platform.beauhurst.com/search/advancedsearch/?avs_json=eyJiYXNlIjoiY29tcGFueSIsImNvbWJpbmUiOiJhbmQiLCJjaGlsZHJlbiI6W119" 
             target="_blank" 
