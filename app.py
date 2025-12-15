@@ -190,7 +190,7 @@ def detect_layout(df):
     cols = list(df.columns.astype(str))
     ind_single = "Industries" if "Industries" in cols else ("(Company) Industries" if "(Company) Industries" in cols else None)
     
-    # FIX: Corrected SyntaxError
+    # Corrected SyntaxError
     buzz_single = "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
     
     ind_wide = [c for c in cols if c.startswith("Industries - ") or c.startswith("(Company) Industries - ")]
@@ -346,7 +346,7 @@ def _warn_boundary_tie(all_labels, all_values, top_n, metric_name, fmt=lambda x:
         return
     try:
         vN = float(all_values[int(top_n) - 1])
-        vNext = float(all_labels[int(top_n)])
+        vNext = float(all_values[int(top_n)])
     except Exception:
         return
     if np.isfinite(vN) and np.isfinite(vNext) and vN == vNext:
@@ -495,12 +495,12 @@ if uploaded_file is not None:
         labels = [str(x) for x in metric_series.index.tolist()]
         values = metric_series.values.tolist()
 
-        # ========================= DATA FILTERING (CONSOLIDATED SECTION 5) =========================
+        # ========================= 5. DATA FILTERING (CONSOLIDATED SECTION) =========================
         with st.sidebar:
             st.markdown("---")
             st.header("5. Data Filtering")
             
-            # --- 5a: RAW DATASET FILTER (ORIGINAL) ---
+            # --- 5a: RAW DATASET FILTER ---
             st.subheader("What are you removing from the dataset completely?")
             
             filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_ind_buzz')
@@ -770,12 +770,12 @@ if uploaded_file is not None:
             labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
             labels, values = list(labels), list(values)
 
-        # ========================= DATA FILTERING (CONSOLIDATED SECTION 5) =========================
+        # ========================= 5. DATA FILTERING (CONSOLIDATED SECTION) =========================
         with st.sidebar:
             st.markdown("---")
             st.header("5. Data Filtering")
             
-            # --- 5a: RAW DATASET FILTER (ORIGINAL) ---
+            # --- 5a: RAW DATASET FILTER ---
             st.subheader("What are you removing from the dataset completely?")
             
             filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_anything')
