@@ -190,7 +190,7 @@ def detect_layout(df):
     cols = list(df.columns.astype(str))
     ind_single = "Industries" if "Industries" in cols else ("(Company) Industries" if "(Company) Industries" in cols else None)
     
-    # FIX: Corrected SyntaxError by properly nesting the conditional expression
+    # FIX: Corrected SyntaxError
     buzz_single = "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
     
     ind_wide = [c for c in cols if c.startswith("Industries - ") or c.startswith("(Company) Industries - ")]
@@ -645,19 +645,21 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START NEW MODIFICATION: Exclusion Filter UI for Industries/Buzzwords ---
-        st.markdown("---")
-        st.subheader("Filter Chart Content")
-        
-        # Get all calculated labels/values (before top-N slicing) for the exclusion list
-        all_labels_for_exclusion = full_labels_ordered
-        
-        excluded_labels = st.multiselect(
-            "Values to Exclude (Select to remove from chart and final data)",
-            options=all_labels_for_exclusion,
-            default=[],
-            help="These items will be completely removed from the chart and download data."
-        )
+        # --- START MODIFICATION: Exclusion Filter UI moved to Sidebar (Section 6b) ---
+        with st.sidebar:
+            st.markdown("---")
+            st.header("6b. Value Exclusion")
+
+            # Get all calculated labels/values (before top-N slicing) for the exclusion list
+            all_labels_for_exclusion = full_labels_ordered
+            
+            excluded_labels = st.multiselect(
+                "Values to Exclude:",
+                options=all_labels_for_exclusion,
+                default=[],
+                key='exclude_ind_buzz',
+                help="These items will be completely removed from the chart and download data."
+            )
 
         # Apply Exclusion Filter to the full ordered list
         if excluded_labels:
@@ -675,7 +677,7 @@ if uploaded_file is not None:
             # Re-slice for the top_n display
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
-        # --- END NEW MODIFICATION ---
+        # --- END MODIFICATION ---
 
 
         # Chart title uses the input from section 2
@@ -883,19 +885,21 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START NEW MODIFICATION: Exclusion Filter UI for Anything Counter/Sum ---
-        st.markdown("---")
-        st.subheader("Filter Chart Content")
-        
-        # Get all calculated labels/values (before top-N slicing) for the exclusion list
-        all_labels_for_exclusion = full_labels_ordered
+        # --- START MODIFICATION: Exclusion Filter UI moved to Sidebar (Section 6b) ---
+        with st.sidebar:
+            st.markdown("---")
+            st.header("6b. Value Exclusion")
 
-        excluded_labels = st.multiselect(
-            "Values to Exclude (Select to remove from chart and final data)",
-            options=all_labels_for_exclusion,
-            default=[],
-            help="These items will be completely removed from the chart and download data."
-        )
+            # Get all calculated labels/values (before top-N slicing) for the exclusion list
+            all_labels_for_exclusion = full_labels_ordered
+
+            excluded_labels = st.multiselect(
+                "Values to Exclude:",
+                options=all_labels_for_exclusion,
+                default=[],
+                key='exclude_anything',
+                help="These items will be completely removed from the chart and download data."
+            )
 
         # Apply Exclusion Filter to the full ordered list
         if excluded_labels:
@@ -913,7 +917,7 @@ if uploaded_file is not None:
             # Re-slice for the top_n display
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
-        # --- END NEW MODIFICATION ---
+        # --- END MODIFICATION ---
 
 
         # Chart title uses the input from section 2
