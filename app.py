@@ -648,9 +648,9 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- 5b: VALUE EXCLUSION FILTER (NEW LOCATION) ---
+        # --- 5b: VALUE EXCLUSION FILTER (Nested under 5) ---
         with st.sidebar:
-            st.markdown("---")
+            st.markdown("---") # Visual separator between dataset filter and visualisation filter
             st.subheader("What are you removing from the visualisation?")
 
             # Get all calculated labels/values (before top-N slicing) for the exclusion list
@@ -891,7 +891,7 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- 5b: VALUE EXCLUSION FILTER (NEW LOCATION) ---
+        # --- 5b: VALUE EXCLUSION FILTER (Nested under 5) ---
         with st.sidebar:
             st.markdown("---")
             st.subheader("What are you removing from the visualisation?")
