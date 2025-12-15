@@ -189,7 +189,7 @@ def find_amount_columns(cols):
 def detect_layout(df):
     cols = list(df.columns.astype(str))
     ind_single = "Industries" if "Industries" in cols else ("(Company) Industries" if "(Company) Industries" in cols else None)
-    buzz_single = "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
+    buzz_single = "Buzzwords" if "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
     ind_wide = [c for c in cols if c.startswith("Industries - ") or c.startswith("(Company) Industries - ")]
     buzz_wide = [c for c in cols if c.startswith("Buzzwords - ") or c.startswith("(Company) Buzzwords - ")]
 
@@ -599,44 +599,81 @@ if uploaded_file is not None:
             top_n = st.number_input(
                 "Number of bars to show:",
                 min_value=1,
-                max_value=len(labels),
-                value=min(10, len(labels)),
+                max_value=len(labels) if labels else 1, # Safety check
+                value=min(10, len(labels)) if labels else 1, # Safety check
                 step=1,
                 help="Use the + / – buttons to adjust."
             )
 
         formatter = money_fmt if ranking_by != "Count" else int_commas
 
+        # Determine the full ordered list based on selection
         if rank_mode in ["Highest first", "Lowest first"]:
             reverse_flag = (rank_mode == "Highest first")
-            full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
-            full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
-
-            _warn_boundary_tie(
-                full_labels_ordered,
-                full_values_ordered,
-                int(top_n),
-                ranking_by,
-                fmt=(money_fmt if ranking_by != "Count" else int_commas)
-            )
-
+            
+            # Handle empty data scenario
+            if not labels:
+                full_labels_ordered, full_values_ordered = [], []
+            else:
+                full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
+                full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
+            
+            # Apply initial top N slice for chart display (will be overridden if exclusion filter is used)
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             highlight_top = True
-        else:
-            default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
-            metric_map = _metric_map(labels, values)
+            
+        else: # Custom (drag & drop)
+            if not labels:
+                default_labels, metric_map = [], {}
+            else:
+                default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
+                metric_map = _metric_map(labels, values)
             
             with st.sidebar:
                 st.markdown("**Drag to Reorder:**")
                 labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
 
-            _warn_boundary_tie(
-                full_ordered_labels,
-                full_ordered_values,
-                int(top_n),
-                ranking_by,
-                fmt=(money_fmt if ranking_by != "Count" else int_commas)
-            )
+        # Check for ties on the *full* ordered list before the final slice
+        _warn_boundary_tie(
+            full_labels_ordered,
+            full_values_ordered,
+            int(top_n),
+            ranking_by,
+            fmt=(money_fmt if ranking_by != "Count" else int_commas)
+        )
+        
+        # --- START NEW MODIFICATION: Exclusion Filter UI for Industries/Buzzwords ---
+        st.markdown("---")
+        st.subheader("Filter Chart Content")
+        
+        # Get all calculated labels/values (before top-N slicing) for the exclusion list
+        all_labels_for_exclusion = full_labels_ordered
+        
+        excluded_labels = st.multiselect(
+            "Values to Exclude (Select to remove from chart and final data)",
+            options=all_labels_for_exclusion,
+            default=[],
+            help="These items will be completely removed from the chart and download data."
+        )
+
+        # Apply Exclusion Filter to the full ordered list
+        if excluded_labels:
+            
+            # Filter the full ordered list
+            temp_labels, temp_values = [], []
+            for lbl, val in zip(full_labels_ordered, full_values_ordered):
+                if lbl not in excluded_labels:
+                    temp_labels.append(lbl)
+                    temp_values.append(val)
+            
+            full_labels_ordered = temp_labels
+            full_values_ordered = temp_values
+            
+            # Re-slice for the top_n display
+            labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
+            st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
+        # --- END NEW MODIFICATION ---
+
 
         # Chart title uses the input from section 2
         chart_title = chart_title_input
@@ -803,42 +840,78 @@ if uploaded_file is not None:
             top_n = st.number_input(
                 "Number of bars to show:",
                 min_value=1,
-                max_value=len(labels),
-                value=min(10, len(labels)),
+                max_value=len(labels) if labels else 1, # Safety check
+                value=min(10, len(labels)) if labels else 1, # Safety check
                 step=1,
                 help="Use the + / – buttons to adjust."
             )
 
+        # Determine the full ordered list based on selection
         if rank_mode in ["Highest first", "Lowest first"]:
             reverse_flag = (rank_mode == "Highest first")
-            full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
-            full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
+            
+            if not labels:
+                full_labels_ordered, full_values_ordered = [], []
+            else:
+                full_labels_ordered, full_values_ordered = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=reverse_flag))
+                full_labels_ordered, full_values_ordered = list(full_labels_ordered), list(full_values_ordered)
 
-            _warn_boundary_tie(
-                full_labels_ordered,
-                full_values_ordered,
-                int(top_n),
-                ranking_by,
-                fmt=(money_fmt if ranking_by != "Count" else int_commas)
-            )
-
+            # Apply initial top N slice for chart display (will be overridden if exclusion filter is used)
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             highlight_top = True
-        else:
-            default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
-            metric_map = _metric_map(labels, values)
+            
+        else: # Custom (drag & drop)
+            if not labels:
+                default_labels, metric_map = [], {}
+            else:
+                default_labels = [lbl for lbl, _ in sorted(zip(labels, values), key=lambda lv: (-lv[1], str(lv[0]).lower()))]
+                metric_map = _metric_map(labels, values)
             
             with st.sidebar:
                 st.markdown("**Drag to Reorder:**")
                 labels, values, highlight_top, full_ordered_labels, full_ordered_values = _drag_order_ui(default_labels, metric_map, int(top_n))
 
-            _warn_boundary_tie(
-                full_ordered_labels,
-                full_ordered_values,
-                int(top_n),
-                ranking_by,
-                fmt=(money_fmt if ranking_by != "Count" else int_commas)
-            )
+        # Check for ties on the *full* ordered list before the final slice
+        _warn_boundary_tie(
+            full_labels_ordered,
+            full_values_ordered,
+            int(top_n),
+            ranking_by,
+            fmt=(money_fmt if ranking_by != "Count" else int_commas)
+        )
+        
+        # --- START NEW MODIFICATION: Exclusion Filter UI for Anything Counter/Sum ---
+        st.markdown("---")
+        st.subheader("Filter Chart Content")
+        
+        # Get all calculated labels/values (before top-N slicing) for the exclusion list
+        all_labels_for_exclusion = full_labels_ordered
+
+        excluded_labels = st.multiselect(
+            "Values to Exclude (Select to remove from chart and final data)",
+            options=all_labels_for_exclusion,
+            default=[],
+            help="These items will be completely removed from the chart and download data."
+        )
+
+        # Apply Exclusion Filter to the full ordered list
+        if excluded_labels:
+            
+            # Filter the full ordered list
+            temp_labels, temp_values = [], []
+            for lbl, val in zip(full_labels_ordered, full_values_ordered):
+                if lbl not in excluded_labels:
+                    temp_labels.append(lbl)
+                    temp_values.append(val)
+            
+            full_labels_ordered = temp_labels
+            full_values_ordered = temp_values
+            
+            # Re-slice for the top_n display
+            labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
+            st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
+        # --- END NEW MODIFICATION ---
+
 
         # Chart title uses the input from section 2
         chart_title = chart_title_input
@@ -870,4 +943,3 @@ if uploaded_file is not None:
 
 else:
     st.markdown("---")
- 
