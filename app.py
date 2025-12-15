@@ -346,7 +346,7 @@ def _warn_boundary_tie(all_labels, all_values, top_n, metric_name, fmt=lambda x:
         return
     try:
         vN = float(all_values[int(top_n) - 1])
-        vNext = float(all_values[int(top_n)])
+        vNext = float(all_labels[int(top_n)])
     except Exception:
         return
     if np.isfinite(vN) and np.isfinite(vNext) and vN == vNext:
@@ -495,10 +495,13 @@ if uploaded_file is not None:
         labels = [str(x) for x in metric_series.index.tolist()]
         values = metric_series.values.tolist()
 
-        # ========================= DATA FILTER SECTION (RAW DATASET FILTER) =========================
+        # ========================= DATA FILTERING (CONSOLIDATED SECTION 5) =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. What are you removing from the dataset completely?")
+            st.header("5. Data Filtering")
+            
+            # --- 5a: RAW DATASET FILTER (ORIGINAL) ---
+            st.subheader("What are you removing from the dataset completely?")
             
             filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_ind_buzz')
             
@@ -645,10 +648,10 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START MODIFICATION: Value Exclusion Filter placed after Data Filter ---
+        # --- 5b: VALUE EXCLUSION FILTER (NEW LOCATION) ---
         with st.sidebar:
             st.markdown("---")
-            st.header("5b. What are you removing from the visualisation?")
+            st.subheader("What are you removing from the visualisation?")
 
             # Get all calculated labels/values (before top-N slicing) for the exclusion list
             all_labels_for_exclusion = full_labels_ordered
@@ -677,7 +680,7 @@ if uploaded_file is not None:
             # Re-slice for the top_n display
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
-        # --- END MODIFICATION ---
+        # --- END 5b ---
 
 
         # Chart title uses the input from section 2
@@ -767,10 +770,13 @@ if uploaded_file is not None:
             labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
             labels, values = list(labels), list(values)
 
-        # ========================= DATA FILTER SECTION (RAW DATASET FILTER) =========================
+        # ========================= DATA FILTERING (CONSOLIDATED SECTION 5) =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. What are you removing from the dataset completely?")
+            st.header("5. Data Filtering")
+            
+            # --- 5a: RAW DATASET FILTER (ORIGINAL) ---
+            st.subheader("What are you removing from the dataset completely?")
             
             filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_anything')
             
@@ -885,10 +891,10 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START MODIFICATION: Value Exclusion Filter placed under Data Filter (Section 5b) ---
+        # --- 5b: VALUE EXCLUSION FILTER (NEW LOCATION) ---
         with st.sidebar:
             st.markdown("---")
-            st.header("5b. What are you removing from the visualisation?")
+            st.subheader("What are you removing from the visualisation?")
 
             # Get all calculated labels/values (before top-N slicing) for the exclusion list
             all_labels_for_exclusion = full_labels_ordered
@@ -917,7 +923,7 @@ if uploaded_file is not None:
             # Re-slice for the top_n display
             labels, values = full_labels_ordered[:int(top_n)], full_values_ordered[:int(top_n)]
             st.info(f"Filtered out {len(excluded_labels)} item(s). Displaying Top {len(labels)} of {len(full_labels_ordered)} remaining items.")
-        # --- END MODIFICATION ---
+        # --- END 5b ---
 
 
         # Chart title uses the input from section 2
