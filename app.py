@@ -189,7 +189,10 @@ def find_amount_columns(cols):
 def detect_layout(df):
     cols = list(df.columns.astype(str))
     ind_single = "Industries" if "Industries" in cols else ("(Company) Industries" if "(Company) Industries" in cols else None)
-    buzz_single = "Buzzwords" if "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
+    
+    # FIX: Corrected SyntaxError by properly nesting the conditional expression
+    buzz_single = "Buzzwords" if "Buzzwords" in cols else ("(Company) Buzzwords" if "(Company) Buzzwords" in cols else None)
+    
     ind_wide = [c for c in cols if c.startswith("Industries - ") or c.startswith("(Company) Industries - ")]
     buzz_wide = [c for c in cols if c.startswith("Buzzwords - ") or c.startswith("(Company) Buzzwords - ")]
 
