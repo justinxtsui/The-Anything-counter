@@ -495,12 +495,12 @@ if uploaded_file is not None:
         labels = [str(x) for x in metric_series.index.tolist()]
         values = metric_series.values.tolist()
 
-        # ========================= DATA FILTER SECTION =========================
+        # ========================= DATA FILTER SECTION (RAW DATASET FILTER) =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. Data Filter (Optional)")
+            st.header("5. What are you removing from the dataset completely?")
             
-            filter_enabled = st.checkbox('Enable Data Filtering', value=False, key='filter_ind_buzz')
+            filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_ind_buzz')
             
             if filter_enabled:
                 filter_mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True, key='filter_mode_ind_buzz')
@@ -645,10 +645,10 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START MODIFICATION: Exclusion Filter UI moved to Sidebar (Section 6b) ---
+        # --- START MODIFICATION: Value Exclusion Filter placed after Data Filter ---
         with st.sidebar:
             st.markdown("---")
-            st.header("6b. Value Exclusion")
+            st.header("5b. What are you removing from the visualisation?")
 
             # Get all calculated labels/values (before top-N slicing) for the exclusion list
             all_labels_for_exclusion = full_labels_ordered
@@ -658,7 +658,7 @@ if uploaded_file is not None:
                 options=all_labels_for_exclusion,
                 default=[],
                 key='exclude_ind_buzz',
-                help="These items will be completely removed from the chart and download data."
+                help="Select values to hide from the chart without affecting the underlying dataset."
             )
 
         # Apply Exclusion Filter to the full ordered list
@@ -767,12 +767,12 @@ if uploaded_file is not None:
             labels, values = zip(*sorted(zip(labels, values), key=lambda lv: lv[1], reverse=True))
             labels, values = list(labels), list(values)
 
-        # ========================= DATA FILTER SECTION =========================
+        # ========================= DATA FILTER SECTION (RAW DATASET FILTER) =========================
         with st.sidebar:
             st.markdown("---")
-            st.header("5. Data Filter (Optional)")
+            st.header("5. What are you removing from the dataset completely?")
             
-            filter_enabled = st.checkbox('Enable Data Filtering', value=False, key='filter_anything')
+            filter_enabled = st.checkbox('Enable Raw Data Filtering', value=False, key='filter_anything')
             
             if filter_enabled:
                 filter_mode = st.radio("Filter mode:", ["Include", "Exclude"], horizontal=True, key='filter_mode_anything')
@@ -885,10 +885,10 @@ if uploaded_file is not None:
             fmt=(money_fmt if ranking_by != "Count" else int_commas)
         )
         
-        # --- START MODIFICATION: Exclusion Filter UI moved to Sidebar (Section 6b) ---
+        # --- START MODIFICATION: Value Exclusion Filter placed under Data Filter (Section 5b) ---
         with st.sidebar:
             st.markdown("---")
-            st.header("6b. Value Exclusion")
+            st.header("5b. What are you removing from the visualisation?")
 
             # Get all calculated labels/values (before top-N slicing) for the exclusion list
             all_labels_for_exclusion = full_labels_ordered
@@ -898,7 +898,7 @@ if uploaded_file is not None:
                 options=all_labels_for_exclusion,
                 default=[],
                 key='exclude_anything',
-                help="These items will be completely removed from the chart and download data."
+                help="Select values to hide from the chart without affecting the underlying dataset."
             )
 
         # Apply Exclusion Filter to the full ordered list
