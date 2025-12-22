@@ -2,15 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import io, os
 from collections import Counter
 from datetime import datetime
 
 # ========================= CONFIGURATION =========================
+# This section ensures fonts stay as text for Adobe Illustrator
+mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['svg.fonttype'] = 'none' 
+# Use a standard font likely to be on both systems
+mpl.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans', 'sans-serif']
+
 APP_TITLE_COLOR = '#000000'
 st.set_page_config(page_title="Ranklin", layout="wide", initial_sidebar_state="expanded")
 
-# Custom CSS for UI and specific "Apply" button styling
+# Custom CSS
 st.markdown("""
     <style>
     h1 { color: #000000 !important; font-weight: 700 !important; }
@@ -27,7 +34,6 @@ st.markdown("""
         height: 3.5rem !important;
         font-weight: bold !important;
         font-size: 1.1rem !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -46,7 +52,6 @@ def load_data(file, sheet_name=None):
 
 @st.cache_data
 def process_industry_buzzword(df_active, layout, amount_choice=None):
-    """Heavy aggregation logic cached for speed"""
     if layout["mode"] == "single":
         inds = df_active[layout["ind_col"]].dropna().astype(str).str.split(",").explode().str.strip()
         buzz = df_active[layout["buzz_col"]].dropna().astype(str).str.split(",").explode().str.strip()
@@ -67,10 +72,13 @@ def process_industry_buzzword(df_active, layout, amount_choice=None):
         return counts
     else:
         pieces = []
-        for k in ["ind_cols", "buzz_cols"]:
-            for c in layout.get(k, []):
-                name = c.split(" - ")[1] if " - " in c else c
+        cols_to_process = layout.get("ind_cols", []) + layout.get("buzz_cols", [])
+        if not cols_to_process: return pd.Series(dtype=float)
+        for c in cols_to_process:
+            if c in df_active.columns:
+                name = c.split(" - ", 1)[-1]
                 pieces.append(df_active[c].rename(name))
+        if not pieces: return pd.Series(dtype=float)
         M = pd.concat(pieces, axis=1).groupby(level=0, axis=1).sum()
         M = (M.fillna(0) != 0) 
         if amount_choice:
@@ -88,8 +96,9 @@ def money_fmt(v):
     return f"£{v:.0f}"
 
 def plot_bar(labels, values, title, highlight_first=True, right_formatter=lambda x: str(x)):
+    # Standardizing font for Adobe compatibility
     fig, ax = plt.subplots(figsize=(10, 6))
-    if not values: return fig
+    if not labels: return fig
     max_val = max(values) if values else 1
     y_pos = list(range(len(labels)))
     ax.barh(y_pos, [max_val] * len(values), color='#E0E0E0', height=0.8)
@@ -102,13 +111,14 @@ def plot_bar(labels, values, title, highlight_first=True, right_formatter=lambda
     offset = max_val * 0.015
     for i, (label, v) in enumerate(zip(labels, values)):
         text_c = 'white' if (highlight_first and i == 0) else 'black'
+        # Labels
         ax.text(offset, i, str(label), va='center', color=text_c, fontsize=11)
+        # Values
         ax.text(max_val - offset, i, right_formatter(v), va='center', ha='right', color=text_c, fontweight='bold')
     ax.set_title(title, fontsize=14, pad=20)
     ax.invert_yaxis()
     return fig
 
-# Re-import layout detectors from user logic
 def detect_layout(df):
     cols = list(df.columns.astype(str))
     ind_s = "Industries" if "Industries" in cols else ("(Company) Industries" if "(Company) Industries" in cols else None)
@@ -141,7 +151,6 @@ if uploaded_file:
         st.markdown("---")
         chart_title = st.text_input("Chart Title:", "Ranking Chart")
         
-        # --- SECTION 2: COLUMN SELECTION (MOVED ABOVE FILTERS) ---
         st.header("2. Analysis Options")
         mode = st.radio("Ranking Industries/Buzzwords?", ["Yes", "No"], horizontal=True)
         
@@ -155,7 +164,6 @@ if uploaded_file:
             amt_choice_raw = st.selectbox("Amount column", ["<None>"] + find_amount_columns(df.columns))
             amount_choice = None if amt_choice_raw == "<None>" else amt_choice_raw
 
-        # --- SECTION 3: RAW DATA FILTERS ---
         st.markdown("---")
         st.header("3. Raw Data Filters")
         if 'rules' not in st.session_state: st.session_state.rules = []
@@ -167,16 +175,15 @@ if uploaded_file:
 
         for i, rule in enumerate(st.session_state.rules):
             with st.expander(f"Filter {i+1}: {rule['col']}"):
-                rule['col'] = st.selectbox("Column", df.columns, key=f"filter_col_{i}")
-                rule['mode'] = st.radio("Action", ["Include", "Exclude"], key=f"filter_mode_{i}", horizontal=True)
+                rule['col'] = st.selectbox("Column", df.columns, key=f"f_col_{i}")
+                rule['mode'] = st.radio("Action", ["Include", "Exclude"], key=f"f_mode_{i}", horizontal=True)
                 opts = sorted(df[rule['col']].astype(str).unique().tolist())
-                rule['vals'] = st.multiselect("Select Values", opts, key=f"filter_vals_{i}")
+                rule['vals'] = st.multiselect("Select Values", opts, key=f"f_vals_{i}")
 
         st.markdown('<div class="apply-btn">', unsafe_allow_html=True)
         apply_trigger = st.button("🚀 APPLY CHANGES", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Filtering Execution
     if apply_trigger or 'df_active' not in st.session_state:
         df_active = df.copy()
         for rule in st.session_state.rules:
@@ -190,18 +197,16 @@ if uploaded_file:
     # --- CALCULATION LOGIC ---
     if mode == "Yes":
         layout = detect_layout(df_active)
-        # Use cached function for heavy lifting
+        if layout["mode"] == "unknown":
+            st.error("Could not find Industry or Buzzword columns.")
+            st.stop()
         metric_series = process_industry_buzzword(df_active, layout, amount_choice if ranking_by != "Count" else None)
-        agg_label = ranking_by
     else:
         if analysis_type == "Sum":
             metric_series = df_active.groupby(target_col)[sum_col].sum()
-            agg_label = "Sum"
         else:
             metric_series = df_active[target_col].value_counts()
-            agg_label = "Count"
 
-    # --- CHART OPTIONS & SORTING ---
     metric_series = metric_series.sort_values(ascending=False)
     
     with st.sidebar:
@@ -209,44 +214,36 @@ if uploaded_file:
         st.header("4. View Options")
         exclude = st.multiselect("Exclude from chart:", metric_series.index.tolist())
         final_series = metric_series.drop(exclude, errors='ignore')
-        
-        top_n = st.number_input("Number of bars", 1, len(final_series) if not final_series.empty else 1, min(10, len(final_series) if not final_series.empty else 1))
+        top_n = st.number_input("Bars", 1, max(1, len(final_series)), min(10, max(1, len(final_series))))
         rank_mode = st.radio("Order:", ["Highest first", "Lowest first"], horizontal=True)
 
     l_chart = final_series.index.tolist()
     v_chart = final_series.values.tolist()
-    
-    if rank_mode == "Lowest first":
-        l_chart, v_chart = l_chart[::-1][:top_n], v_chart[::-1][:top_n]
-    else:
-        l_chart, v_chart = l_chart[:top_n], v_chart[:top_n]
+    if rank_mode == "Lowest first": l_chart, v_chart = l_chart[::-1][:top_n], v_chart[::-1][:top_n]
+    else: l_chart, v_chart = l_chart[:top_n], v_chart[:top_n]
 
     # --- MAIN DISPLAY ---
-    st.subheader(f"Analysis Results ({len(df_active):,} rows after filters)")
-    
+    st.subheader(f"Analysis Results ({len(df_active):,} rows)")
     if not l_chart:
-        st.warning("No data to display. Check your filters.")
+        st.warning("No data found.")
     else:
-        # Determine formatting based on data type
         is_money = (mode == "Yes" and ranking_by != "Count") or (mode == "No" and analysis_type == "Sum")
         fmt = money_fmt if is_money else lambda x: f"{int(x):,}"
-        
         fig = plot_bar(l_chart, v_chart, chart_title, highlight_first=(rank_mode=="Highest first"), right_formatter=fmt)
         st.pyplot(fig)
 
-    # --- DOWNLOADS ---
     with st.sidebar:
         st.markdown("---")
         st.header("5. Download")
         col_a, col_b = st.columns(2)
         
+        # Adobe Illustrator Compatible SVG
         svg_b = io.BytesIO()
-        fig.savefig(svg_b, format="svg", bbox_inches="tight")
-        col_a.download_button("Download SVG", svg_b.getvalue(), "chart.svg", "image/svg+xml")
+        fig.savefig(svg_b, format="svg", bbox_inches="tight", transparent=True)
+        col_a.download_button("SVG (Editable Text)", svg_b.getvalue(), "chart.svg", "image/svg+xml")
         
         png_b = io.BytesIO()
         fig.savefig(png_b, format="png", bbox_inches="tight", dpi=300)
-        col_b.download_button("Download PNG", png_b.getvalue(), "chart.png", "image/png")
-
+        col_b.download_button("PNG (High Res)", png_b.getvalue(), "chart.png", "image/png")
 else:
     st.info("Please upload a file to begin.")
