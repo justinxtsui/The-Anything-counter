@@ -8,10 +8,9 @@ from collections import Counter
 from datetime import datetime
 
 # ========================= CONFIGURATION =========================
-# This section ensures fonts stay as text for Adobe Illustrator
+# Ensuring fonts stay as editable text for Adobe Illustrator
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['svg.fonttype'] = 'none' 
-# Use a standard font likely to be on both systems
 mpl.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans', 'sans-serif']
 
 APP_TITLE_COLOR = '#000000'
@@ -86,6 +85,13 @@ def process_industry_buzzword(df_active, layout, amount_choice=None):
             return M.multiply(amt, axis=0).sum()
         return M.sum()
 
+@st.cache_data
+def process_generic_explode(df_active, target_col):
+    """Cached function to split and count comma-separated strings"""
+    s = df_active[target_col].dropna().astype(str).str.split(",")
+    ex = s.explode().str.strip()
+    return ex[~ex.isin(["","nan", "None"])].value_counts()
+
 # ========================= HELPERS =========================
 
 def money_fmt(v):
@@ -96,7 +102,6 @@ def money_fmt(v):
     return f"£{v:.0f}"
 
 def plot_bar(labels, values, title, highlight_first=True, right_formatter=lambda x: str(x)):
-    # Standardizing font for Adobe compatibility
     fig, ax = plt.subplots(figsize=(10, 6))
     if not labels: return fig
     max_val = max(values) if values else 1
@@ -111,9 +116,7 @@ def plot_bar(labels, values, title, highlight_first=True, right_formatter=lambda
     offset = max_val * 0.015
     for i, (label, v) in enumerate(zip(labels, values)):
         text_c = 'white' if (highlight_first and i == 0) else 'black'
-        # Labels
         ax.text(offset, i, str(label), va='center', color=text_c, fontsize=11)
-        # Values
         ax.text(max_val - offset, i, right_formatter(v), va='center', ha='right', color=text_c, fontweight='bold')
     ax.set_title(title, fontsize=14, pad=20)
     ax.invert_yaxis()
@@ -157,6 +160,8 @@ if uploaded_file:
         if mode == "No":
             analysis_type = st.radio("Analysis Type:", ["Count", "Sum"], horizontal=True)
             target_col = st.selectbox("Select Column to Rank", df.columns)
+            # Re-adding the Explode option for generic columns
+            explode_enabled = st.checkbox("Explode comma-separated values", help="Split values like 'Apple, Orange' into separate counts")
             if analysis_type == "Sum":
                 sum_col = st.selectbox("Numeric Column to Sum", df.select_dtypes(include='number').columns)
         else:
@@ -184,6 +189,7 @@ if uploaded_file:
         apply_trigger = st.button("🚀 APPLY CHANGES", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Filtering Execution
     if apply_trigger or 'df_active' not in st.session_state:
         df_active = df.copy()
         for rule in st.session_state.rules:
@@ -201,12 +207,19 @@ if uploaded_file:
             st.error("Could not find Industry or Buzzword columns.")
             st.stop()
         metric_series = process_industry_buzzword(df_active, layout, amount_choice if ranking_by != "Count" else None)
+        agg_label = ranking_by
     else:
         if analysis_type == "Sum":
             metric_series = df_active.groupby(target_col)[sum_col].sum()
+            agg_label = "Sum"
         else:
-            metric_series = df_active[target_col].value_counts()
+            if explode_enabled:
+                metric_series = process_generic_explode(df_active, target_col)
+            else:
+                metric_series = df_active[target_col].value_counts()
+            agg_label = "Count"
 
+    # --- CHART OPTIONS ---
     metric_series = metric_series.sort_values(ascending=False)
     
     with st.sidebar:
@@ -214,7 +227,8 @@ if uploaded_file:
         st.header("4. View Options")
         exclude = st.multiselect("Exclude from chart:", metric_series.index.tolist())
         final_series = metric_series.drop(exclude, errors='ignore')
-        top_n = st.number_input("Bars", 1, max(1, len(final_series)), min(10, max(1, len(final_series))))
+        
+        top_n = st.number_input("Number of bars", 1, max(1, len(final_series)), min(10, max(1, len(final_series))))
         rank_mode = st.radio("Order:", ["Highest first", "Lowest first"], horizontal=True)
 
     l_chart = final_series.index.tolist()
@@ -236,14 +250,9 @@ if uploaded_file:
         st.markdown("---")
         st.header("5. Download")
         col_a, col_b = st.columns(2)
-        
-        # Adobe Illustrator Compatible SVG
-        svg_b = io.BytesIO()
-        fig.savefig(svg_b, format="svg", bbox_inches="tight", transparent=True)
-        col_a.download_button("SVG (Editable Text)", svg_b.getvalue(), "chart.svg", "image/svg+xml")
-        
-        png_b = io.BytesIO()
-        fig.savefig(png_b, format="png", bbox_inches="tight", dpi=300)
+        svg_b = io.BytesIO(); fig.savefig(svg_b, format="svg", bbox_inches="tight", transparent=True)
+        col_a.download_button("SVG (Adobe)", svg_b.getvalue(), "chart.svg", "image/svg+xml")
+        png_b = io.BytesIO(); fig.savefig(png_b, format="png", bbox_inches="tight", dpi=300)
         col_b.download_button("PNG (High Res)", png_b.getvalue(), "chart.png", "image/png")
 else:
     st.info("Please upload a file to begin.")
